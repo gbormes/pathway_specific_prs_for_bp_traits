@@ -194,7 +194,7 @@ sbp_1KG_final_PRS.txt
 
 If you use or adapt this pipeline, please cite the associated manuscript and reference PLINK appropriately:
 
-- Purcell S, Neale B, Todd-Brown K, Thomas L, Ferreira MAR, Bender D, et al. PLINK: a tool set for whole-genome association and population-based linkage analyses. Am J Hum Genet. 2007 Sep;81(3):559–75. <img width="468" height="41" alt="image" src="https://github.com/user-attachments/assets/2dc1c296-ebb5-4f29-b8ad-2bef3deabe10" />
+- Purcell S, Neale B, Todd-Brown K, Thomas L, Ferreira MAR, Bender D, et al. PLINK: a tool set for whole-genome association and population-based linkage analyses. Am J Hum Genet. 2007 Sep;81(3):559–75.
 
 - Chang CC, Chow CC, Tellier LC, Vattikuti S, Purcell SM, Lee JJ. Second-generation PLINK: rising to the challenge of larger and richer datasets. GigaScience. 2015;4:7. 
 
