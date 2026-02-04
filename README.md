@@ -19,18 +19,6 @@ The workflow follows a standard **base → validation → target cohort** design
 
 ---
 
-## Overview of Analysis Pipeline
-
-1. **GWAS in base (training) cohort**
-2. **Reformat PLINK2 GWAS output**
-3. **LD-based clumping using validation cohort**
-4. **P-value thresholding**
-5. **PRS construction in validation cohort**
-6. **Selection of optimal p-value threshold**
-7. **PRS evaluation in independent target cohort**
-
----
-
 ## Software Requirements
 
 - **PLINK 2.0** (GWAS in base cohort)
