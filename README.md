@@ -1,7 +1,17 @@
 # pathway_specific_prs_for_bp_traits
-Reproducible PLINK-based pipeline for constructing and evaluating polygenic risk scores (PRS) for systolic blood pressure using 1000 Genomes–imputed data.
+Reproducible PLINK-based pipeline for constructing and evaluating polygenic risk scores (PRS) for blood pressure traits using 1000 Genomes–imputed data.
 
-# Polygenic Risk Score (PRS) Construction for Systolic Blood Pressure (SBP)
+Supported traits:
+
+SBP — Systolic Blood Pressure
+
+DBP — Diastolic Blood Pressure
+
+PP — Pulse Pressure
+
+MAP — Mean Arterial Pressure
+
+# Polygenic Risk Score (PRS) Construction for Blood Pressure Traits
 
 This repository contains the full analytic pipeline used to construct, tune, and evaluate polygenic risk scores (PRS) for systolic blood pressure (SBP) using genotype data imputed to the 1000 Genomes (1KG) reference panel. The pipeline is identical for diastolic blood pressure, pulse pressure, and mean arterial pressure. 
 
@@ -63,8 +73,8 @@ pre02a_nax1KG.cov
 
 Required columns include:
 - `FID`, `IID`
-- `rsbp` (raw SBP phenotype)
-- `SBP15` (adjusted/transformed SBP)
+- `rsbp`, 'rdbp', 'rpp', 'rmap' (blood pressure trait residuals)
+- `SBP15`, 'DBP10' (adjusted SBP and DBP)
 - `age`, `sex10`
 - `PC1–PC5`
 
@@ -177,8 +187,8 @@ sbp_1KG_final_PRS.txt
 | `*.clumped` | LD clumping results |
 | `*.valid.snp` | Independent SNP list |
 | `*.profile` | PRS scores |
-| `ngrsbp_1KG_prs.RDS` | PRS tuning results |
-| `sbp_1KG_final_PRS.txt` | Target cohort PRS performance |
+| `ngr_1KG_prs.RDS` | PRS tuning results |
+| `*._1KG_final_PRS.txt` | Target cohort PRS performance |
 
 ---
 
@@ -196,7 +206,9 @@ If you use or adapt this pipeline, please cite the associated manuscript and ref
 
 - Purcell S, Neale B, Todd-Brown K, Thomas L, Ferreira MAR, Bender D, et al. PLINK: a tool set for whole-genome association and population-based linkage analyses. Am J Hum Genet. 2007 Sep;81(3):559–75.
 
-- Chang CC, Chow CC, Tellier LC, Vattikuti S, Purcell SM, Lee JJ. Second-generation PLINK: rising to the challenge of larger and richer datasets. GigaScience. 2015;4:7. 
+- Chang CC, Chow CC, Tellier LC, Vattikuti S, Purcell SM, Lee JJ. Second-generation PLINK: rising to the challenge of larger and richer datasets. GigaScience. 2015;4:7.
+
+- Choi, SW, Mak, TS, O’Reilly, PF. Tutorial: a guide to performing polygenic risk score analyses. Nat Protoc 15, 2759–2772 (2020). 
 
 ---
 
