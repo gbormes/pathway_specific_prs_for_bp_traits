@@ -1,0 +1,207 @@
+############################################################
+# Polygenic Risk Score (PRS) Construction for SBP
+# Imputation reference panel: 1000 Genomes (1KG)
+#
+# Base (training) cohort: pre02a_nex1KG
+# Validation cohort:       pre02a_ngr1KG
+# Target cohort:           pre02a_nax1KG
+#
+# Software:
+#   - PLINK 2.0 (GWAS in base cohort)
+#   - PLINK 1.9 (LD clumping, PRS scoring)
+#   - R (model fitting and evaluation)
+############################################################
+
+
+############################################################
+# 1. GWAS in Base (Training) Cohort
+############################################################
+
+cd /Users/gregorybormes/Downloads/BP1stLinePathway/PLINK-bed_bim_fam-files
+
+plink2 \
+  --bfile pre02a_nex1KG \
+  --input-missing-phenotype -9999 \
+  --glm hide-covar allow-no-covars skip-invalid-pheno \
+  --pheno pre02a_nex1KG.cov \
+  --pheno-name rsbp \
+  --out pre02a_nex1KG_train_rsbp
+
+
+############################################################
+# 2. Reformat PLINK2 Output to PLINK1.9-Style Association File
+############################################################
+# PLINK2 output columns:
+# CHROM POS ID REF ALT A1 A1_FREQ TEST OBS_CT BETA SE T_STAT P ERRCODE
+#
+# Reformatted to:
+# CHR SNP BP EA TEST NMISS BETA STAT P REF ALT OMITTED
+
+awk '{OFS="\t";print $1,$3,$2,$7,$10,$11,$12,$14,$15,$4,$5,$8}' \
+  pre02a_nex1KG_train_rsbp.rsbp.glm.linear > pre02a_nex1KG_train_rsbp.tmp
+
+sed -i 's/#CHROM/CHR/' pre02a_nex1KG_train_rsbp.tmp
+sed -i 's/POS/BP/'     pre02a_nex1KG_train_rsbp.tmp
+sed -i 's/ID/SNP/'     pre02a_nex1KG_train_rsbp.tmp
+sed -i 's/A1/EA/'      pre02a_nex1KG_train_rsbp.tmp
+sed -i 's/OBS_CT/NMISS/' pre02a_nex1KG_train_rsbp.tmp
+sed -i 's/T_STAT/STAT/'  pre02a_nex1KG_train_rsbp.tmp
+
+awk '{OFS="\t"; NR>1;
+  if ($7 < 0) {
+    print $1,$2,$3,$12,$5,$6,-1*$7,-1*$8,$9,$10,$11,$12
+  } else {
+    print $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12
+  }
+}' pre02a_nex1KG_train_rsbp.tmp > pre02a_nex1KG_train_rsbp.assoc.linear
+
+
+############################################################
+# 3. LD-Based Clumping (Validation Cohort as LD Reference)
+############################################################
+# Parameters:
+#   r^2 < 0.1 within 250 kb
+#   P-value threshold for index SNPs: 1.0
+
+plink \
+  --bfile pre02a_ngr1KG \
+  --clump pre02a_nex1KG_train_rsbp.assoc.linear \
+  --clump-p1 1 \
+  --clump-r2 0.1 \
+  --clump-kb 250 \
+  --clump-snp-field SNP \
+  --clump-field P \
+  --out pre02a_ngr1KG_clumped_rsbp
+
+# Extract list of independent SNPs after clumping
+awk 'NR>1{print $3}' pre02a_ngr1KG_clumped_rsbp.clumped \
+  > pre02a_ngr1KG_clumped_rsbp.valid.snp
+
+
+############################################################
+# 4. Prepare SNP P-Value File for Thresholding
+############################################################
+
+awk '{print $2,$9}' pre02a_nex1KG_train_rsbp.assoc.linear \
+  > pre02a_nex1KG_train.SNP.pv.rsbp
+
+
+############################################################
+# 5. Define P-Value Threshold Ranges
+############################################################
+
+cat <<EOF > rsbp_range_list
+0.0010 0 0.0010
+0.0025 0 0.0025
+0.0050 0 0.0050
+0.0075 0 0.0075
+0.0100 0 0.0100
+0.0250 0 0.0250
+0.0500 0 0.0500
+EOF
+
+
+############################################################
+# 6. PRS Construction in Validation Cohort
+############################################################
+
+plink \
+  --bfile pre02a_ngr1KG \
+  --pheno pre02a_ngr1KG.cov \
+  --pheno-name rsbp \
+  --score pre02a_nex1KG_train_rsbp.assoc.linear 2 4 7 sum header \
+  --q-score-range rsbp_range_list pre02a_nex1KG_train.SNP.pv.rsbp \
+  --extract pre02a_ngr1KG_clumped_rsbp.valid.snp \
+  --out ngr1KG_rsbp_prs
+
+
+############################################################
+# 7. Identify Optimal P-Value Threshold (R)
+############################################################
+
+```r
+p.threshold <- c("0.0010","0.0025","0.0050","0.0075","0.0100","0.0250","0.0500")
+
+ngr_phen <- read.table("pre02a_ngr1KG.cov", header=TRUE)[,
+  c("FID","IID","sbp15","age","sex10","PC1","PC2","PC3","PC4","PC5")]
+
+null.model <- lm(sbp15 ~ sex10 + age + PC1 + PC2 + PC3 + PC4 + PC5, data=ngr_phen)
+null.r2 <- summary(null.model)$r.squared
+
+prs.result <- NULL
+
+for (i in p.threshold) {
+  prs <- read.table(paste0("ngr1KG_rsbp_prs.", i, ".profile"),
+                    header=TRUE)[,c("FID","IID","SCORESUM")]
+
+  pheno.prs <- merge(ngr_phen, prs, by=c("FID","IID"))
+
+  model <- lm(sbp15 ~ SCORESUM + sex10 + age + PC1 + PC2 + PC3 + PC4 + PC5,
+              data=pheno.prs)
+
+  model.sum <- summary(model)
+  prs.coef <- model.sum$coeff["SCORESUM",]
+
+  prs.result <- rbind(prs.result,
+    data.frame(
+      Threshold = i,
+      R2 = model.sum$r.squared - null.r2,
+      P = prs.coef[4],
+      BETA = prs.coef[1],
+      SE = prs.coef[2]
+    )
+  )
+}
+
+best <- prs.result[which.max(prs.result$R2), ]
+print(best)
+
+write.table(best$Threshold, file="PT.txt",
+            quote=FALSE, row.names=FALSE, col.names=FALSE)
+
+system("awk '{print $1,0,$1}' PT.txt > sbp_1KG_selected_range")
+system("rm PT.txt")
+
+saveRDS(prs.result, file="ngrsbp_1KG_prs.RDS")
+
+############################################################
+
+8. Apply Optimal PRS Model to Target Cohort
+
+############################################################
+
+plink
+--bfile pre02a_nax1KG
+--pheno pre02a_nax1KG.cov
+--pheno-name rsbp
+--score pre02a_nex1KG_train_rsbp.assoc.linear 2 4 7 sum header
+--q-score-range sbp_1KG_selected_range pre02a_nex1KG_train.SNP.pv.rsbp
+--extract pre02a_ngr1KG_clumped_rsbp.valid.snp
+--out nax1KG_rsbp_prs
+
+############################################################
+
+9. Evaluate PRS Performance in Target Cohort (R)
+
+############################################################
+
+nax_phen <- read.table("pre02a_nax1KG.cov", header=TRUE)[,
+  c("FID","IID","SBP15","age","sex10","PC1","PC2","PC3","PC4","PC5")]
+
+prs <- read.table("nax1KG_rsbp_prs.profile",
+                  header=TRUE)[,c("FID","IID","SCORESUM")]
+
+pheno.prs <- merge(nax_phen, prs, by=c("FID","IID"))
+
+null <- lm(SBP15 ~ sex10 + age + PC1 + PC2 + PC3 + PC4 + PC5, data=pheno.prs)
+full <- lm(SBP15 ~ SCORESUM + sex10 + age + PC1 + PC2 + PC3 + PC4 + PC5,
+           data=pheno.prs)
+
+prs.result <- data.frame(
+  R2 = summary(full)$r.squared - summary(null)$r.squared,
+  P = summary(full)$coeff["SCORESUM",4],
+  BETA = summary(full)$coeff["SCORESUM",1],
+  SE = summary(full)$coeff["SCORESUM",2]
+)
+
+write.table(prs.result, "sbp_1KG_final_PRS.txt", quote=FALSE)
